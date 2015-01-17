@@ -1,54 +1,69 @@
-import Data.ByteString as BS (readFile, writeFile, unpack, pack)
+import Data.ByteString.Lazy as BS (readFile, writeFile, unpack, pack)
 import Data.Word
 import Data.Bits
 
 main = do	
-	b <- getBits "foo.txt"	
-	BS.writeFile "copy.txt" $ bitArrayToByteString b
+	b <- fileToBitArray "foo.txt"
+	BS.writeFile "bar.txt" $ bitArrayToByteString $ map neg b
 
+---
+	
 data Bit = Zero | One
 
+{-
 instance Show Bit where
 	show (Zero) = "0"
 	show (One) = "1"
-	
+-}
 getBit :: Bool -> Bit
 getBit False = Zero
 getBit True = One
+
+zeroes = Zero : zeroes
 	
-getBits :: String -> IO [Bit]
-getBits fp = do
+-----
+
+neg :: Bit -> Bit
+neg One = Zero
+neg Zero = One	
+	
+-----
+	
+fileToBitArray :: String -> IO [Bit]
+fileToBitArray fp = do
 	contents <- fileToWordList fp
-	return $ concat $ map word8ToByteArray contents
+	return $ concat $ map word8ToBitArray contents
 	
 fileToWordList :: String -> IO [Word8]
 fileToWordList fp = do
     contents <- BS.readFile fp
     return $ unpack contents
+		
+word8ToBitArray :: Word8 -> [Bit]	
+word8ToBitArray = word8ToBitArray' 7
 	
-word8ToByteArray x = word8ToByteArray' 7 x
-	
---Word8ToByteArray' :: Int -> Word8 -> [Bool]
-word8ToByteArray' (-1) x = []
-word8ToByteArray' i y = (getBit $ testBit y i) : (word8ToByteArray' (i-1) y)
+word8ToBitArray' :: Int -> Word8 -> [Bit]
+word8ToBitArray' (-1) x = []
+word8ToBitArray' i y = (getBit $ testBit y i) : (word8ToBitArray' (i-1) y)
 
----
-zeroes = Zero : zeroes
+-----
 
+bitArrayToByteString x = BS.pack $ bitArrayToWord8Array x
 
-bitArrayToByteString = BS.pack . bitArrayToWord8Array
-
+bitArrayToWord8Array :: [Bit] -> [Word8]
 bitArrayToWord8Array x = map byteToWord8 $ chop 8 x
 
+chop :: Int -> [a] -> [[a]]
 chop _ [] = []
 chop n xs = take n xs : chop n (drop n xs)
 
-byteToWord8 x = (byteToInt x) :: Word8
+byteToWord8 :: [Bit] -> Word8
+byteToWord8 = (byteToWord8' 7) . bitArrayToByte
 
+byteToWord8' :: Int -> [Bit] -> Word8
+byteToWord8' (-1) _ = clearBit (bit 0) 0
+byteToWord8' n (One:xs) = setBit (byteToWord8' (n-1) xs) n
+byteToWord8' n (Zero:xs) = byteToWord8' (n-1) xs
+
+bitArrayToByte :: [Bit] -> [Bit]
 bitArrayToByte x = take 8 (x++zeroes)
-
-byteToInt = reversedByteToInt . reverse . bitArrayToByte
-
-reversedByteToInt [] = 0
-reversedByteToInt (One:xs) = 1 + 2 * (reversedByteToInt xs)
-reversedByteToInt (Zero:xs) = 2 * (reversedByteToInt xs)
