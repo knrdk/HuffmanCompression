@@ -1,9 +1,7 @@
 import Data.ByteString.Lazy as BS (readFile, writeFile, unpack, pack, hPut)
 import Data.Word
 import Data.Bits
-import System.IO
-
-main = encode
+import System.IO as SIO
 
 copy = do	
 	b <- fileToBitArray "foo.txt"
@@ -12,20 +10,57 @@ copy = do
 makeCodemap b = do
 	return $ getCodemap b
 	
-makeCompressedData b = do
-	cm <- makeCodemap b
-	return $ compress b cm
+makeCompressedData b codemap = do
+	return $ compress b codemap
 	
 encode = do
 	b <- fileToWordList "foo.txt"
-	compressed <- makeCompressedData b
+	codemap <- makeCodemap b
+	writeCodemap "cm.txt" codemap
+	compressed <- makeCompressedData b codemap
 	fhandleOut <- openFile "bar.txt" WriteMode
 	hPutStrLn fhandleOut $ show $ length compressed
 	BS.hPut fhandleOut $ bitArrayToByteString compressed
 	hClose fhandleOut
+	
+writeCodemap fname codemape = do
+	SIO.writeFile fname $ unlines $ map showCode codemape
+	
+decode = do
+	fhandleCm <- openFile "cm.txt" ReadMode
+	codemape <- readCodemape fhandleCm
+	hClose fhandleCm
+	writeCodemap "bak.txt" codemape
+	print $ length codemape
+	
+{-START: readCodemap -}	
+readCodemape fhandle = do
+	eof <- hIsEOF fhandle
+	if eof then return []
+	else
+		do
+			line <- hGetLine fhandle
+			if ((length line) < 2) then return [] 
+			else 
+				do
+					x <- readCodemape fhandle
+					return $ (codeStringToCode line):x
+			--else return (codeStringToCode line) ++ 
 
+codeStringToCode cs = (stringToWord8 (fst (splitString cs '=')), stringToBitArray (snd (splitString cs '=')))
+			
+splitString' "" sep start = (start,"")
+splitString' (x:xs) sep start
+	| x /= sep = splitString' xs sep (start++[x])
+	|otherwise = (start,xs)		
+{-END: readCodemap -}
+			
 compress [] codemap = []
 compress (x:xs) codemap = (getCode x codemap)  ++ (compress xs codemap)
+
+splitString s sep = splitString' s sep ""
+
+
 ---
 	
 data Bit = Zero | One
@@ -72,14 +107,36 @@ chop n xs = take n xs : chop n (drop n xs)
 
 byteToWord8 :: [Bit] -> Word8
 byteToWord8 = (byteToWord8' 7) . bitArrayToByte
+	where bitArrayToByte x = take 8 (x++zeroes)
 
 byteToWord8' :: Int -> [Bit] -> Word8
 byteToWord8' (-1) _ = clearBit (bit 0) 0
 byteToWord8' n (One:xs) = setBit (byteToWord8' (n-1) xs) n
 byteToWord8' n (Zero:xs) = byteToWord8' (n-1) xs
 
-bitArrayToByte :: [Bit] -> [Bit]
-bitArrayToByte x = take 8 (x++zeroes)
+---START: stringToWord8
+
+intToBitArray :: Int -> [Bit]
+intToBitArray 0 = [Zero]
+intToBitArray 1 = [One]
+intToBitArray n = (intToBitArray' (div n 2)) ++ (intToBitArray (mod n 2))
+
+intToBitArray' :: Int -> [Bit]
+intToBitArray' 0 = []
+intToBitArray' n = intToBitArray n
+
+intToWord8 :: Int -> Word8
+intToWord8 = byteToWord8 . addZeroesAtStart . intToBitArray
+	where addZeroesAtStart x = (take (8 - length x) zeroes) ++ x
+
+stringToWord8 :: String -> Word8
+stringToWord8 x = intToWord8 (read x :: Int)
+---END: stringToWord8
+
+stringToBitArray :: String -> [Bit]
+stringToBitArray [] = []
+stringToBitArray ('1':xs) = One : (stringToBitArray xs)
+stringToBitArray ('0':xs) = Zero : (stringToBitArray xs)
 
 -----
 
