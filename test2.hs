@@ -3,10 +3,6 @@ import Data.Word
 import Data.Bits
 import System.IO as SIO
 
-copy = do	
-	b <- fileToBitArray "foo.txt"
-	BS.writeFile "bar.txt" $ bitArrayToByteString b		
-
 makeCodemap b = do
 	return $ getCodemap b
 	
@@ -15,23 +11,44 @@ makeCompressedData b codemap = do
 	
 encode = do
 	b <- fileToWordList "foo.txt"
-	codemap <- makeCodemap b
-	writeCodemap "cm.txt" codemap
+	codemap <- makeCodemap b	
 	compressed <- makeCompressedData b codemap
-	fhandleOut <- openFile "bar.txt" WriteMode
-	hPutStrLn fhandleOut $ show $ length compressed
+	fhandleOut <- openFile "bar.txt" WriteMode	
 	BS.hPut fhandleOut $ bitArrayToByteString compressed
-	hClose fhandleOut
+	hClose fhandleOut	
+	fhCm <- openFile "cm.txt" WriteMode
+	hPutStrLn fhCm $ show $ length compressed
+	writeCodemap fhCm codemap
+	hClose fhCm
 	
-writeCodemap fname codemape = do
-	SIO.writeFile fname $ unlines $ map showCode codemape
+	
+writeCodemap fhandle codemape = do
+	hPutStr fhandle $ unlines $ map showCode codemape
 	
 decode = do
 	fhandleCm <- openFile "cm.txt" ReadMode
+	length <- hGetLine fhandleCm
 	codemape <- readCodemape fhandleCm
 	hClose fhandleCm
-	writeCodemap "bak.txt" codemape
-	print $ length codemape
+	bits <- fileToBitArray "bar.txt"
+	BS.writeFile "decoded.txt" $ BS.pack $ dcd (take (read length :: Int) bits) codemape
+
+dcd = dcd' 0
+
+dcd' n [] codemap = []	
+dcd' n bits codemap = if containsCode (take n bits) codemap 
+	then (getWordForCode (take n bits) codemap):(dcd' 1 (drop n bits) codemap)
+	else dcd' (n+1) bits codemap
+	
+containsCode code [] = False
+containsCode code (c:cs)
+	| code == snd(c) = True
+	| otherwise = containsCode code cs
+
+getWordForCode code [] = error "Brak podanego kodu"
+getWordForCode code (c:cs)
+	| code == snd(c) = fst(c)
+	| otherwise = getWordForCode code cs
 	
 {-START: readCodemap -}	
 readCodemape fhandle = do
@@ -69,6 +86,12 @@ instance Show Bit where
 	show One = "1"
 	show Zero = "0"
 
+instance Eq Bit where
+	One == One = True
+	One == Zero = False
+	Zero == Zero = True
+	Zero == One = False
+	
 getBit :: Bool -> Bit
 getBit False = Zero
 getBit True = One
