@@ -1,14 +1,38 @@
-import Data.ByteString.Lazy as BS (readFile, writeFile, unpack, pack)
+import Data.ByteString.Lazy as BS (readFile, writeFile, unpack, pack, hPut)
 import Data.Word
 import Data.Bits
+import System.IO
+
+main = encode
 
 copy = do	
 	b <- fileToBitArray "foo.txt"
 	BS.writeFile "bar.txt" $ bitArrayToByteString b		
 
+makeCodemap b = do
+	return $ getCodemap b
+	
+makeCompressedData b = do
+	cm <- makeCodemap b
+	return $ compress b cm
+	
+encode = do
+	b <- fileToWordList "foo.txt"
+	compressed <- makeCompressedData b
+	fhandleOut <- openFile "bar.txt" WriteMode
+	hPutStrLn fhandleOut $ show $ length compressed
+	BS.hPut fhandleOut $ bitArrayToByteString compressed
+	hClose fhandleOut
+
+compress [] codemap = []
+compress (x:xs) codemap = (getCode x codemap)  ++ (compress xs codemap)
 ---
 	
 data Bit = Zero | One
+
+instance Show Bit where
+	show One = "1"
+	show Zero = "0"
 
 getBit :: Bool -> Bit
 getBit False = Zero
@@ -107,3 +131,25 @@ buildTree' :: [HuffmanTree a] -> HuffmanTree a
 buildTree' (x:[]) = x
 buildTree' (x:y:[]) = merge x y
 buildTree' (x:y:xs) = buildTree ((merge x y):xs) 
+
+buildCodemapFromTree :: HuffmanTree a -> [(a,[Bit])]
+buildCodemapFromTree (Leaf x w) = [(x,[])]
+buildCodemapFromTree (Node left right w) = (addToEach [Zero] (buildCodemapFromTree left)) ++ (addToEach [One] (buildCodemapFromTree right))
+	where addToEach x = map (\y->(fst y, x ++ snd y))
+
+getCodemap = buildCodemapFromTree . buildTree . getHuffmanTrees
+	
+getCode :: (Eq a) => a -> [(a,[Bit])] -> [Bit]
+getCode _ [] = []
+getCode a (x:xs)
+	| a == fst x = snd x
+	|otherwise = getCode a xs
+	
+showCode :: (Show a) => (a,[Bit]) -> String
+showCode (word,code) = (show word)++"="++(showBitArray code)
+
+showBitArray :: [Bit] -> String
+showBitArray [] = ""
+showBitArray (x:xs) = (show x) ++ showBitArray xs
+
+-----
