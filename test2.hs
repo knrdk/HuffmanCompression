@@ -3,6 +3,8 @@ import Data.Word
 import Data.Bits
 import System.IO as SIO
 
+main = encode
+
 makeCodemap b = do
 	return $ getCodemap b
 	
@@ -233,3 +235,33 @@ showBitArray [] = ""
 showBitArray (x:xs) = (show x) ++ showBitArray xs
 
 -----
+data KeyValuePair key value = KeyValuePair key value deriving (Show)
+
+instance (Eq key) => Eq (KeyValuePair key value) where
+	(KeyValuePair x _) == (KeyValuePair y _) = x == y
+
+instance (Ord key) => Ord (KeyValuePair key value) where
+	(KeyValuePair x _) `compare` (KeyValuePair y _) = x `compare` y
+
+data BST a = BSTEmpty | BSTLeaf a | BSTNode a (BST a) (BST a) deriving (Show)
+
+insert :: (Eq a, Ord a) => a -> BST a -> BST a
+insert element (BSTEmpty) = BSTLeaf element
+insert element (BSTLeaf x)
+	| element == x = error "Proba wstawienia tego samego klucza"
+	| element < x = BSTNode x (BSTLeaf element) (BSTEmpty)
+	| otherwise = BSTNode x (BSTEmpty) (BSTLeaf element)
+insert element (BSTNode x l r)
+	| element == x = error "Proba wstawienia tego samego klucza"
+	| element < x = BSTNode x (insert element l) r
+	| otherwise = BSTNode x l (insert element r)
+	
+get :: (Eq a, Ord a) => a -> BST (KeyValuePair a value) -> value
+get x (BSTEmpty) = error "Brak elementu w drzewie"
+get x (BSTLeaf (KeyValuePair key value))
+	| x == key = value
+	| otherwise = error "Brak element w drzewie"
+get x (BSTNode (KeyValuePair key value) l r)
+	| x == key = value
+	| x < key = get x l
+	| otherwise = get x r
