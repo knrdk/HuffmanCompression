@@ -2,6 +2,7 @@ import Data.ByteString.Lazy as BS (readFile, writeFile, unpack, pack, hPut)
 import Data.Word
 import Data.Bits
 import System.IO as SIO
+import BinarySearchTree as BST (get, insert, preorder, BinarySearchTree(Empty), KeyValuePair(KeyValuePair))
 
 main = encode
 
@@ -25,7 +26,7 @@ encode = do
 	
 	
 writeCodemap fhandle codemape = do
-	hPutStr fhandle $ unlines $ map showCode codemape
+	hPutStr fhandle $ unlines $ map showCode (convertTreeToCodemap codemape)
 	
 decode = do
 	fhandleCm <- openFile "cm.txt" ReadMode
@@ -219,13 +220,17 @@ buildCodemapFromTree (Leaf x w) = [(x,[])]
 buildCodemapFromTree (Node left right w) = (addToEach [Zero] (buildCodemapFromTree left)) ++ (addToEach [One] (buildCodemapFromTree right))
 	where addToEach x = map (\y->(fst y, x ++ snd y))
 
-getCodemap = buildCodemapFromTree . buildTree . getHuffmanTrees
-	
-getCode :: (Eq a) => a -> [(a,[Bit])] -> [Bit]
-getCode _ [] = []
-getCode a (x:xs)
-	| a == fst x = snd x
-	|otherwise = getCode a xs
+getCodemap = convertCodemapToTree . buildCodemapFromTree . buildTree . getHuffmanTrees
+
+convertCodemapToTree codemap = convertCodemapToTree' (BST.Empty) codemap
+convertCodemapToTree' tree [] = tree
+convertCodemapToTree' tree (c:cs) = convertCodemapToTree' (insert (KeyValuePair (fst c) (snd c)) tree) cs
+
+convertTreeToCodemap tree = map project (preorder tree)
+	where project (KeyValuePair key value) = (key,value)
+
+getCode :: (Eq key, Ord key) => key -> BinarySearchTree (KeyValuePair key value)  -> value
+getCode key tree = get key tree
 	
 showCode :: (Show a) => (a,[Bit]) -> String
 showCode (word,code) = (show word)++"="++(showBitArray code)
@@ -235,33 +240,3 @@ showBitArray [] = ""
 showBitArray (x:xs) = (show x) ++ showBitArray xs
 
 -----
-data KeyValuePair key value = KeyValuePair key value deriving (Show)
-
-instance (Eq key) => Eq (KeyValuePair key value) where
-	(KeyValuePair x _) == (KeyValuePair y _) = x == y
-
-instance (Ord key) => Ord (KeyValuePair key value) where
-	(KeyValuePair x _) `compare` (KeyValuePair y _) = x `compare` y
-
-data BST a = BSTEmpty | BSTLeaf a | BSTNode a (BST a) (BST a) deriving (Show)
-
-insert :: (Eq a, Ord a) => a -> BST a -> BST a
-insert element (BSTEmpty) = BSTLeaf element
-insert element (BSTLeaf x)
-	| element == x = error "Proba wstawienia tego samego klucza"
-	| element < x = BSTNode x (BSTLeaf element) (BSTEmpty)
-	| otherwise = BSTNode x (BSTEmpty) (BSTLeaf element)
-insert element (BSTNode x l r)
-	| element == x = error "Proba wstawienia tego samego klucza"
-	| element < x = BSTNode x (insert element l) r
-	| otherwise = BSTNode x l (insert element r)
-	
-get :: (Eq a, Ord a) => a -> BST (KeyValuePair a value) -> value
-get x (BSTEmpty) = error "Brak elementu w drzewie"
-get x (BSTLeaf (KeyValuePair key value))
-	| x == key = value
-	| otherwise = error "Brak element w drzewie"
-get x (BSTNode (KeyValuePair key value) l r)
-	| x == key = value
-	| x < key = get x l
-	| otherwise = get x r
