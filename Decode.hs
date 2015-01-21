@@ -1,17 +1,23 @@
 import Data.ByteString.Lazy as BS (writeFile, pack)
 import System.IO
+import System.Environment (getArgs)
 
 import Util (splitString)
 import Bit (stringToWord8, stringToBitArray)
 import LowLevelIO
 	
 main = do
-	fhandleCm <- openFile "file.cod" ReadMode
+	(a:b:_) <- getArgs
+	decode a b
+	print $ "Wypakowano do " ++ b
+	
+decode inputName outputPath = do
+	fhandleCm <- openFile (inputName++".cod") ReadMode
 	length <- hGetLine fhandleCm
 	codemape <- readCodemape fhandleCm
 	hClose fhandleCm
-	bits <- fileToBitArray "file.dat"
-	BS.writeFile "file.txt" $ BS.pack $ dcd (take (read length :: Int) bits) codemape
+	bits <- fileToBitArray (inputName++".dat")
+	BS.writeFile outputPath $ BS.pack $ dcd (take (read length :: Int) bits) codemape
 
 {-START: dcd-}
 dcd = dcd' 0

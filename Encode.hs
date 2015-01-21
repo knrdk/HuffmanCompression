@@ -1,38 +1,42 @@
-import Data.ByteString.Lazy as BS (readFile, writeFile, unpack, pack, hPut)
-import Data.Word
-import Data.Bits
-import System.IO as SIO
+import Data.ByteString.Lazy as BS (hPut)
+import Data.Word (Word8())
+import System.IO (openFile, hClose, hPutStr, hPutStrLn, IOMode(WriteMode))
+import System.Environment (getArgs)
 
-import Util
+import Util (sort)
 import HuffmanTree
 import BinarySearchTree as BST (get, insert, preorder, BinarySearchTree(Empty), KeyValuePair(KeyValuePair))
-import Bit
-import LowLevelIO
+import Bit (bitArrayToByteString, Bit(Zero,One))
+import LowLevelIO (fileToWordList)
 
 main = do
-	b <- fileToWordList "foo.txt"
-	codemap <- makeCodemap b	
-	compressed <- makeCompressedData b codemap
-	fhandleOut <- openFile "file.dat" WriteMode	
-	BS.hPut fhandleOut $ bitArrayToByteString compressed
-	hClose fhandleOut	
-	fhCm <- openFile "file.cod" WriteMode
+	(a:b:_) <- getArgs
+	encode a b
+	print $ "Plik " ++ a ++ " skompresowano do " ++ b ++ ".dat, " ++ b ++ ".cod"
+
+encode inputPath outputName = do
+	inputBits <- fileToWordList inputPath
+	codemap <- makeCodemap inputBits	
+	compressed <- compressData inputBits codemap
+	fhOut <- openFile (outputName++".dat") WriteMode	
+	BS.hPut fhOut $ bitArrayToByteString compressed
+	hClose fhOut	
+	fhCm <- openFile (outputName++".cod") WriteMode
 	hPutStrLn fhCm $ show $ length compressed
 	writeCodemap fhCm codemap
 	hClose fhCm
 
-makeCodemap b = do
-	return $ getCodemap b
+makeCodemap inputBits = do
+	return $ getCodemap inputBits
 	
-makeCompressedData b codemap = do
-	return $ compress b codemap
+compressData inputBits codemap = do
+	return $ compress inputBits codemap
 
 writeCodemap fhandle codemape = do
 	hPutStr fhandle $ unlines $ map showCode (convertTreeToCodemap codemape)
 	
-compress [] codemap = []
-compress (x:xs) codemap = (getCode x codemap)  ++ (compress xs codemap)
-
+compress x codemap = concat $ map (getCode codemap) x
+	
 {-START: getHuffmanTrees-}
 getHuffmanTrees :: [Word8] -> [HuffmanTree Word8]
 getHuffmanTrees = (map getHuffmanTree) . getFrequencies 
@@ -71,8 +75,8 @@ convertTreeToCodemap tree = map project (preorder tree)
 
 {-END: getCodemap -}
 	
-getCode :: (Eq key, Ord key) => key -> BinarySearchTree (KeyValuePair key value)  -> value
-getCode key tree = get key tree
+getCode :: (Eq key, Ord key) => BinarySearchTree (KeyValuePair key value) -> key -> value
+getCode tree key = get key tree
 	
 {-START: showCode -}	
 showCode :: (Show a) => (a,[Bit]) -> String
