@@ -18,11 +18,17 @@ instance Show Bit where
 	show One = "1"
 	show Zero = "0"
 
+instance Ord Bit where
+	One `compare` One = EQ
+	One `compare` Zero = GT
+	Zero `compare` One = LT
+	Zero `compare` Zero = EQ	
+	
 instance Eq Bit where
 	One == One = True
-	One == Zero = False
-	Zero == Zero = True
+	One == Zero = False	
 	Zero == One = False
+	Zero == Zero = True
 	
 getBit :: Bool -> Bit
 getBit False = Zero

@@ -20,6 +20,14 @@ insert element (Node x l r)
 	| element == x = error "Proba wstawienia tego samego klucza"
 	| element < x = Node x (insert element l) r
 	| otherwise = Node x l (insert element r)
+
+contains :: (Eq a, Ord a) => a -> BinarySearchTree (KeyValuePair a value) -> Bool
+contains x (Empty) = False
+contains x (Leaf (KeyValuePair key value)) = x == key
+contains x (Node (KeyValuePair key value) l r)
+	| x == key = True
+	| x < key = contains x l
+	| otherwise = contains x r
 	
 get :: (Eq a, Ord a) => a -> BinarySearchTree (KeyValuePair a value) -> value
 get x (Empty) = error "Brak elementu w drzewie"
@@ -34,3 +42,7 @@ get x (Node (KeyValuePair key value) l r)
 preorder (Empty) = []
 preorder (Leaf kvp) = [kvp]
 preorder (Node kvp l r) = [kvp] ++ (preorder l) ++ (preorder r)
+
+create x = create' (Empty) x
+create' tree [] = tree
+create' tree (x:xs) = create' (insert x tree) xs
